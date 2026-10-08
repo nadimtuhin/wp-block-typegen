@@ -1,0 +1,11 @@
+{
+  "apiVersion": 2,
+  "name": "demo/messy-hero",
+  "title": "Messy Hero",
+  "attributes": {
+    "Title_Text": { "type": "string" },
+    "count": { "type": "number", "default": "three" },
+    "variant": { "type": "string", "enum": ["a", "b"], "default": "c" },
+    "body": { "type": "string", "source": "html" }
+  }
+}

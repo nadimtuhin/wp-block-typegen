@@ -6,6 +6,9 @@ import { fileURLToPath } from "node:url";
 import { validateBlockJson, type BlockJson } from "./validator.js";
 import { generateBlockTypes } from "./generator.js";
 import { generateCursorRules } from "./cursor-rules.js";
+import { runDoctor, runBreaking } from "./commands.js";
+import { generatePhpTypes } from "./php.js";
+import { generateZod } from "./zod.js";
 
 const VERSION = "1.0.0";
 
@@ -21,6 +24,11 @@ OPTIONS:
   -d, --dir <path>       Target directory to scan for block.json files (default: current directory)
   -o, --out <path>       Output path for a combined types file (default: colocated types.ts next to block.json)
       --cursor           Generate .cursor/rules/gutenberg-blocks.mdc for Cursor / AI assistants
+      --doctor           Score each block.json (A+ to F). Exit 1 if any block scores < 70
+      --roast            Same as --doctor, but honest
+      --breaking <ref>   Diff block.json against a git ref; flag changes that break saved posts
+      --php              Also write <block>/types.php (PHPStan array shape for render.php)
+      --zod              Also write <block>/schema.ts (zod runtime validator)
       --check            Validate block.json files without writing types (CI gate)
   -w, --watch            Watch for changes to block.json files and regenerate automatically
   -v, --version          Print version and exit
@@ -58,6 +66,11 @@ export function runCLI(args: string[] = process.argv.slice(2)): { exitCode: numb
   let emitCursor = false;
   let checkOnly = false;
   let watchMode = false;
+  let doctor = false;
+  let roast = false;
+  let breakingRef: string | null = null;
+  let emitPhp = false;
+  let emitZod = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -75,6 +88,17 @@ export function runCLI(args: string[] = process.argv.slice(2)): { exitCode: numb
       combinedOut = args[++i] || null;
     } else if (arg === "--cursor") {
       emitCursor = true;
+    } else if (arg === "--doctor") {
+      doctor = true;
+    } else if (arg === "--roast") {
+      doctor = true;
+      roast = true;
+    } else if (arg === "--breaking") {
+      breakingRef = args[++i] || "HEAD";
+    } else if (arg === "--php") {
+      emitPhp = true;
+    } else if (arg === "--zod") {
+      emitZod = true;
     } else if (arg === "--check") {
       checkOnly = true;
     } else if (arg === "-w" || arg === "--watch") {
@@ -157,6 +181,8 @@ export function runCLI(args: string[] = process.argv.slice(2)): { exitCode: numb
         const outPath = path.join(dir, "types.ts");
         fs.writeFileSync(outPath, item.types, "utf-8");
         console.log(`  ✓ Wrote types to: ${path.relative(process.cwd(), outPath)}`);
+        if (emitPhp) fs.writeFileSync(path.join(dir, "types.php"), generatePhpTypes(item.block), "utf-8");
+        if (emitZod) fs.writeFileSync(path.join(dir, "schema.ts"), generateZod(item.block), "utf-8");
       }
     }
 
@@ -171,6 +197,14 @@ export function runCLI(args: string[] = process.argv.slice(2)): { exitCode: numb
 
     console.log(`[wp-block-typegen] Done. Processed ${generatedOutputs.length} block(s).`);
     return !hasErrors;
+  }
+
+  if (doctor || breakingRef) {
+    const files = findBlockJsonFiles(absoluteTarget);
+    let ok = true;
+    if (doctor) ok = runDoctor(files, roast) && ok;
+    if (breakingRef) ok = runBreaking(files, breakingRef) && ok;
+    return { exitCode: ok ? 0 : 1 };
   }
 
   const initialSuccess = executeRun();

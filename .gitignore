@@ -3,3 +3,5 @@ node_modules/
 .cursor/
 tests/fixtures/**/types.ts
 .DS_Store
+tests/fixtures/**/types.php
+tests/fixtures/**/schema.ts

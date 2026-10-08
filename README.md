@@ -177,6 +177,33 @@ export default function Edit({ attributes, setAttributes }: CardEditProps) {
 
 ---
 
+## Doctor, breaking-change guard, PHP and zod
+
+### `--doctor` / `--roast`: score every block
+```
+┌─ demo/messy-hero
+│  ███████░░░░░░░░░░░░░  33/100  grade F
+│  Call the block police.
+│  ✖ attributes.count: "count" says "number" but defaults to "three". Bold.
+│  ✖ attributes.variant: Default isn't in its own enum. Not even the block trusts the block.
+└─
+```
+`--doctor` prints plain messages, `--roast` prints the same findings with attitude. Exit code 1 when any block scores under 70, so it works as a CI gate. Checks: default vs type, default vs enum, `source: html` without selector, camelCase, `apiVersion`, `$schema`, `textdomain`, `supports.html`, god-blocks (>15 attributes).
+
+### `--breaking <git-ref>`: will this change break saved posts?
+```bash
+wp-block-typegen src/blocks --breaking origin/main
+```
+Diffs each `block.json` against the version at that ref. Removed attributes, type changes, removed enum values and changed `source`/`selector` are BREAKING (exit 1) and print a ready-to-paste `deprecated` stub with the old attributes. Default changes are RISKY, because defaults are not serialized. New attributes are safe. Nested object property changes are not compared yet.
+
+### `--php`: PHPStan shape for `render.php`
+Writes `types.php` with a `@phpstan-type` array shape, so `$attributes` in `render.php` is typed too. Defaulted keys are required (WordPress fills them), the rest are optional.
+
+### `--zod`: runtime validation
+Writes `schema.ts` with a zod schema for REST payloads, patterns and migrations. Needs `zod` in your project.
+
+---
+
 ## Compatibility
 
 - WordPress 6.0+ (`apiVersion: 2` and `apiVersion: 3`)

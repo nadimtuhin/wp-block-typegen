@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "tenup/featured-media-card",
+  "title": "Featured Media Card",
+  "category": "theme",
+  "icon": "format-gallery",
+  "description": "Enterprise media card with responsive image, focal point, and CTA list.",
+  "attributes": {
+    "heading": {
+      "type": "string",
+      "source": "html",
+      "selector": "h3",
+      "default": ""
+    },
+    "subheading": {
+      "type": "string",
+      "default": ""
+    },
+    "media": {
+      "type": "object",
+      "default": { "id": 0, "url": "", "alt": "" },
+      "properties": {
+        "id": { "type": "number" },
+        "url": { "type": "string" },
+        "alt": { "type": "string" },
+        "focalPoint": {
+          "type": "object",
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" }
+          }
+        }
+      }
+    },
+    "layout": {
+      "type": "string",
+      "enum": ["horizontal", "vertical", "overlay"],
+      "default": "horizontal"
+    },
+    "aspectRatio": {
+      "type": "string",
+      "enum": ["16:9", "4:3", "1:1", "auto"],
+      "default": "16:9"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "ctas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "label": { "type": "string" },
+          "url": { "type": "string" },
+          "target": { "type": "string", "enum": ["_self", "_blank"] }
+        }
+      },
+      "default": []
+    },
+    "publishedDate": {
+      "type": ["string", "null"],
+      "default": null
+    }
+  },
+  "usesContext": ["postId", "postType"],
+  "supports": {
+    "spacing": {
+      "margin": true,
+      "padding": true
+    },
+    "typography": {
+      "fontSize": true,
+      "lineHeight": true
+    }
+  }
+}

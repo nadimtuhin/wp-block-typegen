@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.cursor/
+tests/fixtures/**/types.ts
+.DS_Store

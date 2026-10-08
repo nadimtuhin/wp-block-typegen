@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "example/callout",
+  "title": "Callout",
+  "category": "design",
+  "icon": "megaphone",
+  "description": "A prominent callout banner for important notices.",
+  "attributes": {
+    "title": {
+      "type": "string",
+      "default": "Important Note"
+    },
+    "variant": {
+      "type": "string",
+      "enum": ["info", "warning", "success", "error"],
+      "default": "info"
+    },
+    "isDismissible": {
+      "type": "boolean",
+      "default": false
+    },
+    "dismissCount": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "supports": {
+    "html": false,
+    "align": ["wide", "full"],
+    "color": {
+      "text": true,
+      "background": true
+    }
+  }
+}

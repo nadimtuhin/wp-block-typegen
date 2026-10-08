@@ -1,0 +1,49 @@
+{
+  "name": "wp-block-typegen",
+  "version": "1.0.0",
+  "description": "Zero-dependency TypeScript type generator & Cursor/Copilot AI context builder for WordPress block.json",
+  "type": "module",
+  "bin": {
+    "wp-block-typegen": "./bin/wp-block-typegen.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "bin",
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "bun build src/cli.ts --outfile=dist/cli.js --target=node && bun build src/index.ts --outfile=dist/index.js --target=node",
+    "dev": "bun run src/cli.ts",
+    "test": "bun test",
+    "lint": "bun x tsc --noEmit"
+  },
+  "keywords": [
+    "wordpress",
+    "gutenberg",
+    "block.json",
+    "typescript",
+    "typegen",
+    "cursorrules",
+    "copilot",
+    "10up",
+    "blocks"
+  ],
+  "author": "Omar Faruque Tuhin (Nadim Tuhin) <nadimtuhin+pad@gmail.com> (https://www.nadimtuhin.com)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nadimtuhin/wp-block-typegen.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nadimtuhin/wp-block-typegen/issues"
+  },
+  "homepage": "https://github.com/nadimtuhin/wp-block-typegen#readme",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}

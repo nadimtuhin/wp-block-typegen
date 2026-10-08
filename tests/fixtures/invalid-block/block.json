@@ -1,0 +1,8 @@
+{
+  "name": "invalid-block-no-namespace",
+  "attributes": {
+    "brokenAttr": {
+      "type": "invalid_type_name"
+    }
+  }
+}

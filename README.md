@@ -45,7 +45,12 @@ In enterprise WordPress engineering, `block.json` is the source of truth for blo
 
 ## Installation
 
-### Local project install
+### From GitHub (not yet on npm)
+```bash
+bun add -d github:nadimtuhin/wp-block-typegen
+```
+
+### From npm (once published)
 ```bash
 npm install -D wp-block-typegen
 # or

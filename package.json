@@ -19,7 +19,9 @@
     "build": "bun build src/cli.ts --outfile=dist/cli.js --target=node && bun build src/index.ts --outfile=dist/index.js --target=node",
     "dev": "bun run src/cli.ts",
     "test": "bun test",
-    "lint": "bun x tsc --noEmit"
+    "lint": "bun x tsc --noEmit",
+    "prepare": "bun run build",
+    "prepublishOnly": "bun test && bun run build"
   },
   "keywords": [
     "wordpress",

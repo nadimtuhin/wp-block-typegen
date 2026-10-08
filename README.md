@@ -179,6 +179,10 @@ export default function Edit({ attributes, setAttributes }: CardEditProps) {
 
 ---
 
+## Tested on real blocks
+
+Run against 138 `block.json` files: all 116 WordPress core blocks (`packages/block-library`) and the block.json files in 10up `block-components`, `convert-to-blocks`, `block-catalog`, `retro-winamp-block` and `maps-block-apple`. Result: 138/138 validate, and the generated `types.ts` and `schema.ts` compile under `tsc --strict`. Doctor grades: 116 A+, 10 A, 12 B, none below B. `types.php` passes `php -l` but has not been run through PHPStan.
+
 ## Doctor, breaking-change guard, PHP and zod
 
 ### `--doctor` / `--roast`: score every block

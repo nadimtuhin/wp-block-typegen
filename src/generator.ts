@@ -1,10 +1,12 @@
-import type { BlockAttributeSchema, BlockJson } from "./validator.js";
+import { itemsOf, type BlockAttributeSchema, type BlockJson } from "./validator.js";
 
 export interface GenerateOptions {
   includeReactProps?: boolean;
   prefixNamespace?: boolean;
   exportFormat?: "types" | "declaration";
 }
+
+const key = (k: string) => (/^[A-Za-z_$][\w$]*$/.test(k) ? k : JSON.stringify(k));
 
 function toPascalCase(str: string): string {
   return str
@@ -47,8 +49,8 @@ function resolveType(
     return resolveObjectType(schema.properties, indent);
   }
 
-  if (schema.items) {
-    return `${resolveType(schema.items, indent)}[]`;
+  if (itemsOf(schema)) {
+    return `${resolveType(itemsOf(schema)!, indent)}[]`;
   }
 
   return "unknown";
@@ -61,6 +63,7 @@ function resolvePrimitiveType(
 ): string {
   switch (type) {
     case "string":
+    case "rich-text":
       return "string";
     case "number":
     case "integer":
@@ -70,8 +73,8 @@ function resolvePrimitiveType(
     case "null":
       return "null";
     case "array":
-      if (schema.items) {
-        const itemType = resolveType(schema.items, indent);
+      if (itemsOf(schema)) {
+        const itemType = resolveType(itemsOf(schema)!, indent);
         return itemType.includes("|") || itemType.includes("{")
           ? `Array<${itemType}>`
           : `${itemType}[]`;
@@ -95,10 +98,10 @@ function resolveObjectType(
   const innerPad = " ".repeat(indent + 2);
   const lines: string[] = ["{"];
 
-  for (const [key, propSchema] of Object.entries(properties)) {
+  for (const [propKey, propSchema] of Object.entries(properties)) {
     const isOptional = propSchema.default === undefined;
     const propType = resolveType(propSchema, indent + 2);
-    lines.push(`${innerPad}${key}${isOptional ? "?" : ""}: ${propType};`);
+    lines.push(`${innerPad}${key(propKey)}${isOptional ? "?" : ""}: ${propType};`);
   }
 
   lines.push(`${pad}}`);
@@ -138,15 +141,15 @@ export function generateBlockTypes(
   if (entries.length === 0) {
     output.push("  [key: string]: unknown;");
   } else {
-    for (const [key, schema] of entries) {
+    for (const [attrKey, schema] of entries) {
       const hasDefault = schema.default !== undefined;
       const isOptional = !hasDefault;
-      const tsType = resolveType(schema, 2);
+      const tsType = resolveType(schema, 2) + (schema.default === null && !/\bnull\b/.test(resolveType(schema, 2)) ? " | null" : "");
 
       if (schema.default !== undefined) {
         output.push(`  /** @default ${JSON.stringify(schema.default)} */`);
       }
-      output.push(`  ${key}${isOptional ? "?" : ""}: ${tsType};`);
+      output.push(`  ${key(attrKey)}${isOptional ? "?" : ""}: ${tsType};`);
     }
   }
 
@@ -165,7 +168,7 @@ export function generateBlockTypes(
     if (block.usesContext && block.usesContext.length > 0) {
       output.push(`  context: {`);
       for (const ctx of block.usesContext) {
-        output.push(`    ${ctx}?: unknown;`);
+        output.push(`    ${key(ctx)}?: unknown;`);
       }
       output.push(`  };`);
     } else {

@@ -1,4 +1,11 @@
 // src/validator.ts
+function itemsOf(s) {
+  if (s.items)
+    return s.items;
+  if (s.query)
+    return { type: "object", properties: s.query };
+  return;
+}
 var VALID_TYPES = new Set([
   "string",
   "number",
@@ -6,7 +13,8 @@ var VALID_TYPES = new Set([
   "boolean",
   "array",
   "object",
-  "null"
+  "null",
+  "rich-text"
 ]);
 function validateBlockJson(data) {
   const issues = [];
@@ -84,6 +92,7 @@ function validateBlockJson(data) {
   };
 }
 // src/generator.ts
+var key = (k) => /^[A-Za-z_$][\w$]*$/.test(k) ? k : JSON.stringify(k);
 function toPascalCase(str) {
   return str.replace(/[^a-zA-Z0-9]+(.)/g, (_, chr) => chr.toUpperCase()).replace(/^[a-z]/, (chr) => chr.toUpperCase());
 }
@@ -108,14 +117,15 @@ function resolveType(schema, indent = 2) {
   if (schema.properties) {
     return resolveObjectType(schema.properties, indent);
   }
-  if (schema.items) {
-    return `${resolveType(schema.items, indent)}[]`;
+  if (itemsOf(schema)) {
+    return `${resolveType(itemsOf(schema), indent)}[]`;
   }
   return "unknown";
 }
 function resolvePrimitiveType(type, schema, indent) {
   switch (type) {
     case "string":
+    case "rich-text":
       return "string";
     case "number":
     case "integer":
@@ -125,8 +135,8 @@ function resolvePrimitiveType(type, schema, indent) {
     case "null":
       return "null";
     case "array":
-      if (schema.items) {
-        const itemType = resolveType(schema.items, indent);
+      if (itemsOf(schema)) {
+        const itemType = resolveType(itemsOf(schema), indent);
         return itemType.includes("|") || itemType.includes("{") ? `Array<${itemType}>` : `${itemType}[]`;
       }
       return "unknown[]";
@@ -143,10 +153,10 @@ function resolveObjectType(properties, indent) {
   const pad = " ".repeat(indent);
   const innerPad = " ".repeat(indent + 2);
   const lines = ["{"];
-  for (const [key, propSchema] of Object.entries(properties)) {
+  for (const [propKey, propSchema] of Object.entries(properties)) {
     const isOptional = propSchema.default === undefined;
     const propType = resolveType(propSchema, indent + 2);
-    lines.push(`${innerPad}${key}${isOptional ? "?" : ""}: ${propType};`);
+    lines.push(`${innerPad}${key(propKey)}${isOptional ? "?" : ""}: ${propType};`);
   }
   lines.push(`${pad}}`);
   return lines.join(`
@@ -178,14 +188,14 @@ function generateBlockTypes(block, options = {}) {
   if (entries.length === 0) {
     output.push("  [key: string]: unknown;");
   } else {
-    for (const [key, schema] of entries) {
+    for (const [attrKey, schema] of entries) {
       const hasDefault = schema.default !== undefined;
       const isOptional = !hasDefault;
-      const tsType = resolveType(schema, 2);
+      const tsType = resolveType(schema, 2) + (schema.default === null && !/\bnull\b/.test(resolveType(schema, 2)) ? " | null" : "");
       if (schema.default !== undefined) {
         output.push(`  /** @default ${JSON.stringify(schema.default)} */`);
       }
-      output.push(`  ${key}${isOptional ? "?" : ""}: ${tsType};`);
+      output.push(`  ${key(attrKey)}${isOptional ? "?" : ""}: ${tsType};`);
     }
   }
   output.push("}");
@@ -201,7 +211,7 @@ function generateBlockTypes(block, options = {}) {
     if (block.usesContext && block.usesContext.length > 0) {
       output.push(`  context: {`);
       for (const ctx of block.usesContext) {
-        output.push(`    ${ctx}?: unknown;`);
+        output.push(`    ${key(ctx)}?: unknown;`);
       }
       output.push(`  };`);
     } else {
@@ -236,11 +246,11 @@ function generateCursorRules(blocks) {
       lines.push(`- **API Version:** ${block.apiVersion}`);
     if (block.attributes && Object.keys(block.attributes).length > 0) {
       lines.push("- **Attributes Schema:**");
-      for (const [key, attr] of Object.entries(block.attributes)) {
+      for (const [key2, attr] of Object.entries(block.attributes)) {
         const typeStr = Array.isArray(attr.type) ? attr.type.join(" | ") : attr.type || "unknown";
         const enumStr = attr.enum ? ` (enum: ${attr.enum.map((e) => JSON.stringify(e)).join(", ")})` : "";
         const defaultStr = attr.default !== undefined ? ` [default: ${JSON.stringify(attr.default)}]` : "";
-        lines.push(`  - \`${key}\`: \`${typeStr}\`${enumStr}${defaultStr}`);
+        lines.push(`  - \`${key2}\`: \`${typeStr}\`${enumStr}${defaultStr}`);
       }
     } else {
       lines.push("- **Attributes:** None declared");
@@ -287,7 +297,7 @@ var GRADES = [
 ];
 var typeOf = (v) => v === null ? "null" : Array.isArray(v) ? "array" : typeof v;
 function defaultMatches(s) {
-  if (s.default === undefined || !s.type)
+  if (s.default === undefined || s.default === null || !s.type)
     return true;
   const actual = typeOf(s.default);
   const types = Array.isArray(s.type) ? s.type : [s.type];
@@ -307,20 +317,25 @@ function doctorBlock(b) {
   if (b.supports && b.supports.html !== false)
     add("html-editing", "info", "supports.html", "Set supports.html=false so users cannot hand-edit markup into an invalid block.", "Raw HTML editing is on. Someone WILL paste a <marquee>.");
   const attrs = Object.entries(b.attributes ?? {});
-  if (attrs.length > 15)
+  if (attrs.length > 20)
     add("god-block", "warn", "attributes", `${attrs.length} attributes. Split into inner blocks.`, `${attrs.length} attributes. This isn't a block, it's a lifestyle.`);
+  const noDefault = [];
   for (const [k, s] of attrs) {
     const at = `attributes.${k}`;
-    if (!/^[a-z][a-zA-Z0-9]*$/.test(k))
+    if (!k.startsWith("__") && !/^[a-z][a-zA-Z0-9]*$/.test(k))
       add("attr-case", "warn", at, `"${k}" should be camelCase.`, `"${k}"? Pick a case and commit to it.`);
     if (s.default === undefined && s.source === undefined)
-      add("no-default", "info", at, `"${k}" has no default; it is optional everywhere.`, `"${k}" has no default. undefined is not a personality.`);
+      noDefault.push(k);
     if (!defaultMatches(s))
       add("default-type", "error", at, `Default ${JSON.stringify(s.default)} does not match type ${JSON.stringify(s.type)}.`, `"${k}" says ${JSON.stringify(s.type)} but defaults to ${JSON.stringify(s.default)}. Bold.`);
     if (s.enum && s.default !== undefined && !s.enum.includes(s.default))
       add("default-enum", "error", at, `Default ${JSON.stringify(s.default)} is not in enum.`, `Default isn't in its own enum. Not even the block trusts the block.`);
     if (s.source === "html" && !s.selector)
       add("source-selector", "error", at, 'source "html" needs a selector.', `source:"html" with no selector. Where, exactly?`);
+  }
+  if (noDefault.length) {
+    const list = noDefault.slice(0, 4).join(", ") + (noDefault.length > 4 ? `, +${noDefault.length - 4} more` : "");
+    add("no-default", "info", "attributes", `${noDefault.length} without a default (optional in generated types): ${list}.`, `${noDefault.length} attributes with no default (${list}). undefined is not a personality.`);
   }
   const score = Math.max(0, 100 - f.reduce((n, x) => n + PENALTY[x.level], 0));
   const [, grade, quip] = GRADES.find(([min]) => score >= min);
@@ -361,9 +376,9 @@ function diffBlocks(o, n) {
     }
     if (normType(os.type) !== normType(ns.type))
       add("breaking", at, `Type ${normType(os.type)} -> ${normType(ns.type)}. Old content fails validation.`);
-    for (const key of ["source", "selector", "attribute"])
-      if (os[key] !== ns[key])
-        add("breaking", at, `${key} ${j(os[key])} -> ${j(ns[key])}. Serialization changed; block validation will fail.`);
+    for (const key2 of ["source", "selector", "attribute"])
+      if (os[key2] !== ns[key2])
+        add("breaking", at, `${key2} ${j(os[key2])} -> ${j(ns[key2])}. Serialization changed; block validation will fail.`);
     const gone = (os.enum ?? []).filter((v) => !(ns.enum ?? []).includes(v));
     if (os.enum && ns.enum && gone.length)
       add("breaking", at, `Enum values removed: ${j(gone)}. Posts using them become invalid.`);
@@ -447,7 +462,7 @@ ${newB.name} vs ${ref}: ${changes.length ? "" : "no attribute changes"}`);
 }
 
 // src/php.ts
-var key = (k) => /^[A-Za-z_]\w*$/.test(k) ? k : `'${k.replace(/'/g, "\\'")}'`;
+var key2 = (k) => /^[A-Za-z_]\w*$/.test(k) ? k : `'${k.replace(/'/g, "\\'")}'`;
 var lit = (v) => typeof v === "string" ? `'${v.replace(/'/g, "\\'")}'` : String(v);
 function php(s) {
   if (s.enum?.length)
@@ -460,6 +475,7 @@ function php(s) {
 function prim(t, s) {
   switch (t) {
     case "string":
+    case "rich-text":
       return "string";
     case "number":
       return "int|float";
@@ -470,7 +486,7 @@ function prim(t, s) {
     case "null":
       return "null";
     case "array":
-      return `array<${s.items ? php(s.items) : "mixed"}>`;
+      return `array<${itemsOf(s) ? php(itemsOf(s)) : "mixed"}>`;
     case "object":
       return s.properties ? shape(s.properties) : "array<string, mixed>";
     default:
@@ -478,7 +494,7 @@ function prim(t, s) {
   }
 }
 function shape(props) {
-  const parts = Object.entries(props).map(([k, p]) => `${key(k)}${p.default === undefined ? "?" : ""}: ${php(p)}`);
+  const parts = Object.entries(props).map(([k, p]) => `${key2(k)}${p.default === undefined ? "?" : ""}: ${php(p)}`);
   return `array{${parts.join(", ")}}`;
 }
 function generatePhpTypes(block) {
@@ -498,7 +514,7 @@ final class ${base}BlockTypes {}
 }
 
 // src/zod.ts
-var key2 = (k) => /^[A-Za-z_$][\w$]*$/.test(k) ? k : JSON.stringify(k);
+var key3 = (k) => /^[A-Za-z_$][\w$]*$/.test(k) ? k : JSON.stringify(k);
 function zt(s) {
   if (s.enum?.length) {
     if (s.enum.every((v) => typeof v === "string"))
@@ -515,6 +531,7 @@ function zt(s) {
 function prim2(t, s) {
   switch (t) {
     case "string":
+    case "rich-text":
       return "z.string()";
     case "number":
       return "z.number()";
@@ -525,7 +542,7 @@ function prim2(t, s) {
     case "null":
       return "z.null()";
     case "array":
-      return `z.array(${s.items ? zt(s.items) : "z.unknown()"})`;
+      return `z.array(${itemsOf(s) ? zt(itemsOf(s)) : "z.unknown()"})`;
     case "object":
       return s.properties ? obj(s.properties) : "z.record(z.string(), z.unknown())";
     default:
@@ -533,7 +550,7 @@ function prim2(t, s) {
   }
 }
 function obj(props) {
-  const rows = Object.entries(props).map(([k, p]) => `${key2(k)}: ${zt(p)}${p.default !== undefined ? `.default(${JSON.stringify(p.default)})` : ".optional()"}`);
+  const rows = Object.entries(props).map(([k, p]) => `${key3(k)}: ${zt(p)}${p.default === null && !/z\.null\(\)/.test(zt(p)) ? ".nullish().default(null)" : p.default !== undefined ? `.default(${JSON.stringify(p.default)})` : ".optional()"}`);
   return `z.object({ ${rows.join(", ")} })`;
 }
 function generateZod(block) {
@@ -548,7 +565,7 @@ export type ${base}AttributesParsed = z.infer<typeof ${base}AttributesSchema>;
 }
 
 // src/cli.ts
-var VERSION = "1.1.0";
+var VERSION = "1.1.1";
 function printHelp() {
   console.log(`
 wp-block-typegen v${VERSION}
@@ -657,7 +674,8 @@ function runCLI(args = process.argv.slice(2)) {
         const rawContent = fs2.readFileSync(file, "utf-8");
         const parsed = JSON.parse(rawContent);
         const { valid, block, issues } = validateBlockJson(parsed);
-        const relativePath = path2.relative(process.cwd(), file);
+        const rp = path2.relative(process.cwd(), file);
+        const relativePath = rp.startsWith("..") ? file : rp;
         for (const issue of issues) {
           if (issue.severity === "error") {
             console.error(`  ✖ [ERROR] ${relativePath} (${issue.field}): ${issue.message}`);
@@ -753,6 +771,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path2.resolve(process.
 export {
   validateBlockJson,
   runCLI,
+  itemsOf,
   getBlockTypeName,
   generateZod,
   generatePhpTypes,

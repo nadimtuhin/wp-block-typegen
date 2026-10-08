@@ -29,7 +29,8 @@ const typeOf = (v: unknown): string =>
   v === null ? "null" : Array.isArray(v) ? "array" : typeof v;
 
 function defaultMatches(s: BlockAttributeSchema): boolean {
-  if (s.default === undefined || !s.type) return true;
+  // null defaults are legal in core for any type (e.g. latest-posts)
+  if (s.default === undefined || s.default === null || !s.type) return true;
   const actual = typeOf(s.default);
   const types = Array.isArray(s.type) ? s.type : [s.type];
   return types.some((t) =>
@@ -64,18 +65,17 @@ export function doctorBlock(b: BlockJson): Report {
       "Raw HTML editing is on. Someone WILL paste a <marquee>.");
 
   const attrs = Object.entries(b.attributes ?? {});
-  if (attrs.length > 15)
+  if (attrs.length > 20)
     add("god-block", "warn", "attributes", `${attrs.length} attributes. Split into inner blocks.`,
       `${attrs.length} attributes. This isn't a block, it's a lifestyle.`);
 
+  const noDefault: string[] = [];
   for (const [k, s] of attrs) {
     const at = `attributes.${k}`;
-    if (!/^[a-z][a-zA-Z0-9]*$/.test(k))
+    if (!k.startsWith("__") && !/^[a-z][a-zA-Z0-9]*$/.test(k))
       add("attr-case", "warn", at, `"${k}" should be camelCase.`,
         `"${k}"? Pick a case and commit to it.`);
-    if (s.default === undefined && s.source === undefined)
-      add("no-default", "info", at, `"${k}" has no default; it is optional everywhere.`,
-        `"${k}" has no default. undefined is not a personality.`);
+    if (s.default === undefined && s.source === undefined) noDefault.push(k);
     if (!defaultMatches(s))
       add("default-type", "error", at, `Default ${JSON.stringify(s.default)} does not match type ${JSON.stringify(s.type)}.`,
         `"${k}" says ${JSON.stringify(s.type)} but defaults to ${JSON.stringify(s.default)}. Bold.`);
@@ -85,6 +85,12 @@ export function doctorBlock(b: BlockJson): Report {
     if (s.source === "html" && !s.selector)
       add("source-selector", "error", at, 'source "html" needs a selector.',
         `source:"html" with no selector. Where, exactly?`);
+  }
+
+  if (noDefault.length) {
+    const list = noDefault.slice(0, 4).join(", ") + (noDefault.length > 4 ? `, +${noDefault.length - 4} more` : "");
+    add("no-default", "info", "attributes", `${noDefault.length} without a default (optional in generated types): ${list}.`,
+      `${noDefault.length} attributes with no default (${list}). undefined is not a personality.`);
   }
 
   const score = Math.max(0, 100 - f.reduce((n, x) => n + PENALTY[x.level], 0));

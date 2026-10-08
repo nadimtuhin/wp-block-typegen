@@ -1,6 +1,6 @@
 {
   "name": "wp-block-typegen",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Zero-dependency TypeScript type generator & Cursor/Copilot AI context builder for WordPress block.json",
   "type": "module",
   "bin": {

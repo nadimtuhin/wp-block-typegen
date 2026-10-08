@@ -10,7 +10,7 @@ import { runDoctor, runBreaking } from "./commands.js";
 import { generatePhpTypes } from "./php.js";
 import { generateZod } from "./zod.js";
 
-const VERSION = "1.1.0";
+const VERSION = "1.1.1";
 
 function printHelp(): void {
   console.log(`
@@ -131,7 +131,8 @@ export function runCLI(args: string[] = process.argv.slice(2)): { exitCode: numb
         const parsed = JSON.parse(rawContent);
         const { valid, block, issues } = validateBlockJson(parsed);
 
-        const relativePath = path.relative(process.cwd(), file);
+        const rp = path.relative(process.cwd(), file);
+        const relativePath = rp.startsWith("..") ? file : rp;
 
         for (const issue of issues) {
           if (issue.severity === "error") {

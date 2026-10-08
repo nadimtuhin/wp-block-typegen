@@ -13,7 +13,15 @@ export interface BlockAttributeSchema {
   source?: string;
   selector?: string;
   attribute?: string;
+  query?: Record<string, BlockAttributeSchema>;
   [key: string]: unknown;
+}
+
+/** Item schema of an array attribute: explicit `items`, or the shape of a `source: "query"` row. */
+export function itemsOf(s: BlockAttributeSchema): BlockAttributeSchema | undefined {
+  if (s.items) return s.items;
+  if (s.query) return { type: "object", properties: s.query };
+  return undefined;
 }
 
 export interface BlockJson {
@@ -39,6 +47,7 @@ const VALID_TYPES = new Set([
   "array",
   "object",
   "null",
+  "rich-text", // Gutenberg-specific: stored as an HTML string
 ]);
 
 export function validateBlockJson(data: unknown): {

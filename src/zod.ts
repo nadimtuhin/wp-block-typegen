@@ -1,5 +1,5 @@
 import { getBlockTypeName } from "./generator.js";
-import type { BlockAttributeSchema, BlockJson } from "./validator.js";
+import { itemsOf, type BlockAttributeSchema, type BlockJson } from "./validator.js";
 
 const key = (k: string) => (/^[A-Za-z_$][\w$]*$/.test(k) ? k : JSON.stringify(k));
 
@@ -17,12 +17,13 @@ function zt(s: BlockAttributeSchema): string {
 
 function prim(t: string, s: BlockAttributeSchema): string {
   switch (t) {
-    case "string": return "z.string()";
+    case "string":
+    case "rich-text": return "z.string()";
     case "number": return "z.number()";
     case "integer": return "z.number().int()";
     case "boolean": return "z.boolean()";
     case "null": return "z.null()";
-    case "array": return `z.array(${s.items ? zt(s.items) : "z.unknown()"})`;
+    case "array": return `z.array(${itemsOf(s) ? zt(itemsOf(s)!) : "z.unknown()"})`;
     case "object": return s.properties ? obj(s.properties) : "z.record(z.string(), z.unknown())";
     default: return "z.unknown()";
   }
@@ -31,7 +32,7 @@ function prim(t: string, s: BlockAttributeSchema): string {
 function obj(props: Record<string, BlockAttributeSchema>): string {
   const rows = Object.entries(props).map(
     ([k, p]) =>
-      `${key(k)}: ${zt(p)}${p.default !== undefined ? `.default(${JSON.stringify(p.default)})` : ".optional()"}`,
+      `${key(k)}: ${zt(p)}${p.default === null && !/z\.null\(\)/.test(zt(p)) ? ".nullish().default(null)" : p.default !== undefined ? `.default(${JSON.stringify(p.default)})` : ".optional()"}`,
   );
   return `z.object({ ${rows.join(", ")} })`;
 }

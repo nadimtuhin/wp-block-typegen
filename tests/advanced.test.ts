@@ -115,3 +115,47 @@ describe("php + zod", () => {
     expect(z).toContain("when: z.union([z.string(), z.null()]).default(null)");
   });
 });
+
+describe("real-world core patterns", () => {
+  const core: BlockJson = JSON.parse(
+    require("node:fs").readFileSync(new URL("./fixtures/core-like-block/block.json", import.meta.url), "utf-8"),
+  );
+  it("accepts rich-text, null defaults, __unstable names", async () => {
+    const { validateBlockJson } = await import("../src/validator.js");
+    expect(validateBlockJson(core).valid).toBe(true);
+    const ids = doctorBlock(core).findings.map((f) => f.id);
+    expect(ids).not.toContain("default-type");
+    expect(ids).not.toContain("attr-case");
+  });
+  it("types rich-text as string and query rows as typed items", async () => {
+    const { generateBlockTypes } = await import("../src/generator.js");
+    const t = generateBlockTypes(core);
+    expect(t).toContain("caption?: string;");
+    expect(t).toContain("images: Array<{");
+    expect(t).toContain("url?: string;");
+    expect(generatePhpTypes(core)).toContain("images: array<array{url?: string, alt: string}>");
+    expect(generateZod(core)).toContain("caption: z.string().optional()");
+  });
+  it("groups missing defaults into one finding", () => {
+    const r = doctorBlock({ name: "a/b", attributes: { a: { type: "string" }, b: { type: "string" }, c: { type: "string" } } });
+    expect(r.findings.filter((f) => f.id === "no-default").length).toBe(1);
+  });
+});
+
+describe("generated code is valid", () => {
+  const b: BlockJson = {
+    name: "core/x-y",
+    usesContext: ["core/accordion-icon-position"],
+    attributes: { "data-x": { type: "string", default: "" }, w: { type: "number", default: null } },
+  };
+  it("quotes non-identifier keys and context names", async () => {
+    const { generateBlockTypes } = await import("../src/generator.js");
+    const t = generateBlockTypes(b);
+    expect(t).toContain('"data-x": string;');
+    expect(t).toContain('"core/accordion-icon-position"?: unknown;');
+    expect(t).toContain("w: number | null;");
+  });
+  it("zod accepts null default on a number", () => {
+    expect(generateZod(b)).toContain("w: z.number().nullish().default(null)");
+  });
+});

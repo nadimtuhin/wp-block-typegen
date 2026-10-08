@@ -1,5 +1,5 @@
 import { getBlockTypeName } from "./generator.js";
-import type { BlockAttributeSchema, BlockJson } from "./validator.js";
+import { itemsOf, type BlockAttributeSchema, type BlockJson } from "./validator.js";
 
 const key = (k: string) => (/^[A-Za-z_]\w*$/.test(k) ? k : `'${k.replace(/'/g, "\\'")}'`);
 const lit = (v: unknown) => (typeof v === "string" ? `'${v.replace(/'/g, "\\'")}'` : String(v));
@@ -13,12 +13,13 @@ function php(s: BlockAttributeSchema): string {
 
 function prim(t: string, s: BlockAttributeSchema): string {
   switch (t) {
-    case "string": return "string";
+    case "string":
+    case "rich-text": return "string";
     case "number": return "int|float";
     case "integer": return "int";
     case "boolean": return "bool";
     case "null": return "null";
-    case "array": return `array<${s.items ? php(s.items) : "mixed"}>`;
+    case "array": return `array<${itemsOf(s) ? php(itemsOf(s)!) : "mixed"}>`;
     case "object": return s.properties ? shape(s.properties) : "array<string, mixed>";
     default: return "mixed";
   }

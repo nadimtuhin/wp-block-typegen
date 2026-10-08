@@ -22,5 +22,11 @@ jobs:
       - name: Run tests
         run: bun test
 
+      - name: Typecheck
+        run: bun x tsc --noEmit
+
       - name: Build dist
         run: bun run build
+
+      - name: dist is up to date
+        run: git diff --exit-code dist

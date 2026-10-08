@@ -1,5 +1,7 @@
 # wp-block-typegen
 
+![block.json to types.ts, types.php, schema.ts and AI rules](docs/images/hero.png)
+
 Zero-dependency TypeScript type generator and Cursor/Copilot AI context builder for WordPress Gutenberg `block.json`.
 
 ---
@@ -191,6 +193,9 @@ export default function Edit({ attributes, setAttributes }: CardEditProps) {
 `--doctor` prints plain messages, `--roast` prints the same findings with attitude. Exit code 1 when any block scores under 70, so it works as a CI gate. Checks: default vs type, default vs enum, `source: html` without selector, camelCase, `apiVersion`, `$schema`, `textdomain`, `supports.html`, god-blocks (>15 attributes).
 
 ### `--breaking <git-ref>`: will this change break saved posts?
+
+![Diff flow: safe, risky, breaking, deprecated stub](docs/images/flow.png)
+
 ```bash
 wp-block-typegen src/blocks --breaking origin/main
 ```

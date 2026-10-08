@@ -1,0 +1,3 @@
+- [ ] Test added or updated
+- [ ] `bun test`, `bun x tsc --noEmit`, `bun run build` pass
+- [ ] `dist/` rebuilt and committed

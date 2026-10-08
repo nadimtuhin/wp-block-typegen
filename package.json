@@ -1,6 +1,6 @@
 {
   "name": "wp-block-typegen",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Zero-dependency TypeScript type generator & Cursor/Copilot AI context builder for WordPress block.json",
   "type": "module",
   "bin": {
@@ -34,7 +34,7 @@
     "10up",
     "blocks"
   ],
-  "author": "Omar Faruque Tuhin (Nadim Tuhin) <nadimtuhin+pad@gmail.com> (https://www.nadimtuhin.com)",
+  "author": "Nadim Tuhin (https://www.nadimtuhin.com)",
   "license": "MIT",
   "repository": {
     "type": "git",

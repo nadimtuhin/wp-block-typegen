@@ -548,7 +548,7 @@ export type ${base}AttributesParsed = z.infer<typeof ${base}AttributesSchema>;
 }
 
 // src/cli.ts
-var VERSION = "1.0.0";
+var VERSION = "1.1.0";
 function printHelp() {
   console.log(`
 wp-block-typegen v${VERSION}

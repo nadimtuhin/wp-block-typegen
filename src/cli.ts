@@ -10,7 +10,7 @@ import { runDoctor, runBreaking } from "./commands.js";
 import { generatePhpTypes } from "./php.js";
 import { generateZod } from "./zod.js";
 
-const VERSION = "1.0.0";
+const VERSION = "1.1.0";
 
 function printHelp(): void {
   console.log(`

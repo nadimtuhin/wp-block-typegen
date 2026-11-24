@@ -50,10 +50,15 @@ function resolveType(
   }
 
   if (itemsOf(schema)) {
-    return `${resolveType(itemsOf(schema)!, indent)}[]`;
+    return arrayOf(resolveType(itemsOf(schema)!, indent));
   }
 
   return "unknown";
+}
+
+/** `T[]` for simple item types; `Array<T>` when `T[]` would bind wrongly (unions) or be unreadable (objects). */
+function arrayOf(itemType: string): string {
+  return itemType.includes("|") || itemType.includes("{") ? `Array<${itemType}>` : `${itemType}[]`;
 }
 
 function resolvePrimitiveType(
@@ -74,10 +79,7 @@ function resolvePrimitiveType(
       return "null";
     case "array":
       if (itemsOf(schema)) {
-        const itemType = resolveType(itemsOf(schema)!, indent);
-        return itemType.includes("|") || itemType.includes("{")
-          ? `Array<${itemType}>`
-          : `${itemType}[]`;
+        return arrayOf(resolveType(itemsOf(schema)!, indent));
       }
       return "unknown[]";
     case "object":

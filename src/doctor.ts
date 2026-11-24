@@ -72,6 +72,11 @@ export function doctorBlock(b: BlockJson): Report {
   const noDefault: string[] = [];
   for (const [k, s] of attrs) {
     const at = `attributes.${k}`;
+    if (!s || typeof s !== "object" || Array.isArray(s)) {
+      add("attr-not-object", "error", at, `"${k}" must be an object definition.`,
+        `"${k}" is ${JSON.stringify(s)}. That's not an attribute, that's a shrug.`);
+      continue;
+    }
     if (!k.startsWith("__") && !/^[a-z][a-zA-Z0-9]*$/.test(k))
       add("attr-case", "warn", at, `"${k}" should be camelCase.`,
         `"${k}"? Pick a case and commit to it.`);

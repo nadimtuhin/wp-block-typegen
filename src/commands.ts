@@ -19,6 +19,11 @@ export function runDoctor(files: string[], roast: boolean): boolean {
       ok = false;
       continue;
     }
+    if (!block || typeof block !== "object" || Array.isArray(block)) {
+      console.error(`✖ ${rel(f)}: block.json must be a JSON object`);
+      ok = false;
+      continue;
+    }
     const r = doctorBlock(block);
     console.log(formatReport(block.name ?? rel(f), r, roast));
     if (r.score < 70) ok = false;
@@ -40,8 +45,15 @@ export function runBreaking(files: string[], ref: string): boolean {
       console.log(`· ${rel(f)}: not present at ${ref} (new block, nothing to break)`);
       continue;
     }
-    const oldB: BlockJson = JSON.parse(oldRaw);
-    const newB: BlockJson = JSON.parse(fs.readFileSync(f, "utf-8"));
+    let oldB: BlockJson, newB: BlockJson;
+    try {
+      oldB = JSON.parse(oldRaw);
+      newB = JSON.parse(fs.readFileSync(f, "utf-8"));
+    } catch (e) {
+      console.error(`✖ ${rel(f)}: invalid JSON here or at ${ref} (${e instanceof Error ? e.message : e})`);
+      ok = false;
+      continue;
+    }
     const changes = diffBlocks(oldB, newB);
     const risky = changes.filter((c) => c.level !== "safe");
     console.log(`\n${newB.name} vs ${ref}: ${changes.length ? "" : "no attribute changes"}`);

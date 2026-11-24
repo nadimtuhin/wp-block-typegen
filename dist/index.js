@@ -51,7 +51,20 @@ function validateBlockJson(data) {
       severity: "warning"
     });
   }
-  if (raw.attributes && typeof raw.attributes === "object") {
+  if (raw.usesContext !== undefined && (!Array.isArray(raw.usesContext) || raw.usesContext.some((c) => typeof c !== "string"))) {
+    issues.push({
+      field: "usesContext",
+      message: '"usesContext" must be an array of context names (e.g. ["postId"])',
+      severity: "error"
+    });
+  }
+  if (raw.attributes !== undefined && (!raw.attributes || typeof raw.attributes !== "object" || Array.isArray(raw.attributes))) {
+    issues.push({
+      field: "attributes",
+      message: '"attributes" must be an object mapping attribute names to definitions',
+      severity: "error"
+    });
+  } else if (raw.attributes) {
     const attrs = raw.attributes;
     for (const [attrName, attrValue] of Object.entries(attrs)) {
       if (!attrValue || typeof attrValue !== "object") {
@@ -118,9 +131,12 @@ function resolveType(schema, indent = 2) {
     return resolveObjectType(schema.properties, indent);
   }
   if (itemsOf(schema)) {
-    return `${resolveType(itemsOf(schema), indent)}[]`;
+    return arrayOf(resolveType(itemsOf(schema), indent));
   }
   return "unknown";
+}
+function arrayOf(itemType) {
+  return itemType.includes("|") || itemType.includes("{") ? `Array<${itemType}>` : `${itemType}[]`;
 }
 function resolvePrimitiveType(type, schema, indent) {
   switch (type) {
@@ -136,8 +152,7 @@ function resolvePrimitiveType(type, schema, indent) {
       return "null";
     case "array":
       if (itemsOf(schema)) {
-        const itemType = resolveType(itemsOf(schema), indent);
-        return itemType.includes("|") || itemType.includes("{") ? `Array<${itemType}>` : `${itemType}[]`;
+        return arrayOf(resolveType(itemsOf(schema), indent));
       }
       return "unknown[]";
     case "object":
@@ -246,11 +261,11 @@ function generateCursorRules(blocks) {
       lines.push(`- **API Version:** ${block.apiVersion}`);
     if (block.attributes && Object.keys(block.attributes).length > 0) {
       lines.push("- **Attributes Schema:**");
-      for (const [key2, attr] of Object.entries(block.attributes)) {
+      for (const [key, attr] of Object.entries(block.attributes)) {
         const typeStr = Array.isArray(attr.type) ? attr.type.join(" | ") : attr.type || "unknown";
         const enumStr = attr.enum ? ` (enum: ${attr.enum.map((e) => JSON.stringify(e)).join(", ")})` : "";
         const defaultStr = attr.default !== undefined ? ` [default: ${JSON.stringify(attr.default)}]` : "";
-        lines.push(`  - \`${key2}\`: \`${typeStr}\`${enumStr}${defaultStr}`);
+        lines.push(`  - \`${key}\`: \`${typeStr}\`${enumStr}${defaultStr}`);
       }
     } else {
       lines.push("- **Attributes:** None declared");
@@ -322,6 +337,10 @@ function doctorBlock(b) {
   const noDefault = [];
   for (const [k, s] of attrs) {
     const at = `attributes.${k}`;
+    if (!s || typeof s !== "object" || Array.isArray(s)) {
+      add("attr-not-object", "error", at, `"${k}" must be an object definition.`, `"${k}" is ${JSON.stringify(s)}. That's not an attribute, that's a shrug.`);
+      continue;
+    }
     if (!k.startsWith("__") && !/^[a-z][a-zA-Z0-9]*$/.test(k))
       add("attr-case", "warn", at, `"${k}" should be camelCase.`, `"${k}"? Pick a case and commit to it.`);
     if (s.default === undefined && s.source === undefined)
@@ -376,9 +395,9 @@ function diffBlocks(o, n) {
     }
     if (normType(os.type) !== normType(ns.type))
       add("breaking", at, `Type ${normType(os.type)} -> ${normType(ns.type)}. Old content fails validation.`);
-    for (const key2 of ["source", "selector", "attribute"])
-      if (os[key2] !== ns[key2])
-        add("breaking", at, `${key2} ${j(os[key2])} -> ${j(ns[key2])}. Serialization changed; block validation will fail.`);
+    for (const key of ["source", "selector", "attribute"])
+      if (os[key] !== ns[key])
+        add("breaking", at, `${key} ${j(os[key])} -> ${j(ns[key])}. Serialization changed; block validation will fail.`);
     const gone = (os.enum ?? []).filter((v) => !(ns.enum ?? []).includes(v));
     if (os.enum && ns.enum && gone.length)
       add("breaking", at, `Enum values removed: ${j(gone)}. Posts using them become invalid.`);
@@ -420,6 +439,11 @@ function runDoctor(files, roast) {
       ok = false;
       continue;
     }
+    if (!block || typeof block !== "object" || Array.isArray(block)) {
+      console.error(`✖ ${rel(f)}: block.json must be a JSON object`);
+      ok = false;
+      continue;
+    }
     const r = doctorBlock(block);
     console.log(formatReport(block.name ?? rel(f), r, roast));
     if (r.score < 70)
@@ -440,8 +464,15 @@ function runBreaking(files, ref) {
       console.log(`· ${rel(f)}: not present at ${ref} (new block, nothing to break)`);
       continue;
     }
-    const oldB = JSON.parse(oldRaw);
-    const newB = JSON.parse(fs.readFileSync(f, "utf-8"));
+    let oldB, newB;
+    try {
+      oldB = JSON.parse(oldRaw);
+      newB = JSON.parse(fs.readFileSync(f, "utf-8"));
+    } catch (e) {
+      console.error(`✖ ${rel(f)}: invalid JSON here or at ${ref} (${e instanceof Error ? e.message : e})`);
+      ok = false;
+      continue;
+    }
     const changes = diffBlocks(oldB, newB);
     const risky = changes.filter((c) => c.level !== "safe");
     console.log(`
@@ -769,16 +800,16 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path2.resolve(process.
   }
 }
 export {
-  validateBlockJson,
-  runCLI,
-  itemsOf,
-  getBlockTypeName,
-  generateZod,
-  generatePhpTypes,
-  generateCursorRules,
-  generateBlockTypes,
-  formatReport,
-  doctorBlock,
+  deprecatedStub,
   diffBlocks,
-  deprecatedStub
+  doctorBlock,
+  formatReport,
+  generateBlockTypes,
+  generateCursorRules,
+  generatePhpTypes,
+  generateZod,
+  getBlockTypeName,
+  itemsOf,
+  runCLI,
+  validateBlockJson
 };

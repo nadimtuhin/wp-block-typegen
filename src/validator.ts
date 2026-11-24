@@ -94,7 +94,22 @@ export function validateBlockJson(data: unknown): {
     });
   }
 
-  if (raw.attributes && typeof raw.attributes === "object") {
+  if (raw.usesContext !== undefined &&
+      (!Array.isArray(raw.usesContext) || raw.usesContext.some((c) => typeof c !== "string"))) {
+    issues.push({
+      field: "usesContext",
+      message: '"usesContext" must be an array of context names (e.g. ["postId"])',
+      severity: "error",
+    });
+  }
+
+  if (raw.attributes !== undefined && (!raw.attributes || typeof raw.attributes !== "object" || Array.isArray(raw.attributes))) {
+    issues.push({
+      field: "attributes",
+      message: '"attributes" must be an object mapping attribute names to definitions',
+      severity: "error",
+    });
+  } else if (raw.attributes) {
     const attrs = raw.attributes as Record<string, unknown>;
     for (const [attrName, attrValue] of Object.entries(attrs)) {
       if (!attrValue || typeof attrValue !== "object") {
